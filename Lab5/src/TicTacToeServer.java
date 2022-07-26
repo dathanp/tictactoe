@@ -26,6 +26,11 @@ public class TicTacToeServer extends JFrame
     private Lock gameLock; // to lock game for synchronization
     private Condition otherPlayerConnected; // to wait for other player
     private Condition otherPlayerTurn; // to wait for other player's turn
+    static ArrayList<Integer> player1 = new ArrayList<>();
+    static ArrayList<Integer> player2 = new ArrayList<>();
+    private boolean player1Win;
+    private boolean player2Win;
+    private boolean isTie;
 
     // set up tic-tac-toe server and GUI that displays messages
     public TicTacToeServer()
@@ -105,10 +110,25 @@ public class TicTacToeServer extends JFrame
                 {
                     public void run() // updates outputArea
                     {
+                        players[currentPlayer].winMessage();
                         outputArea.append(messageToDisplay); // add message
                     }
                 }
         );
+    }
+
+    public void addLocation(int location){
+        if (currentPlayer == 0){
+            player1.add(location);
+            if(player1.size() >= 3){
+                winCheck();
+            }
+        } else if(currentPlayer == 1) {
+            player2.add(location);
+            if(player2.size() >= 3){
+                winCheck();
+            }
+        }
     }
 
     // determine if move is valid
@@ -137,8 +157,9 @@ public class TicTacToeServer extends JFrame
         if (!isOccupied(location))
         {
             board[location] = MARKS[currentPlayer]; // set move on board
+            addLocation(location);
+            players[currentPlayer].winMessage();
             currentPlayer = (currentPlayer + 1) % 2; // change player
-
             // let new current player know that move occurred
             players[currentPlayer].otherPlayerMoved(location);
 
@@ -159,20 +180,62 @@ public class TicTacToeServer extends JFrame
             return false; // notify player that move was invalid
     }
 
+    public void winCheck(){
+
+        List topRow = Arrays.asList(0,1,2);
+        List midRow = Arrays.asList(3,4,5);
+        List lowRow = Arrays.asList(6,7,8);
+        List leftC = Arrays.asList(0,3,6);
+        List midC = Arrays.asList(1,4,7);
+        List rightC = Arrays.asList(2,5,8);
+        List crossUp = Arrays.asList(6,4,2);
+        List crossLow = Arrays.asList(0,4,8);
+
+        List<List> winConditions = new ArrayList<>();
+        winConditions.add(topRow);
+        winConditions.add(midRow);
+        winConditions.add(lowRow);
+        winConditions.add(leftC);
+        winConditions.add(midC);
+        winConditions.add(rightC);
+        winConditions.add(crossUp);
+        winConditions.add(crossLow);
+
+        for(List i : winConditions){
+            if(player1.containsAll(i)){
+                player1Win = true;
+            }else if(player2.containsAll(i)){
+                player2Win = true;
+            }else if(player1.size() + player2.size() == 9){
+                isTie = true;
+            }
+        }
+    }
+
+
+
     // determine whether location is occupied
     public boolean isOccupied(int location)
     {
         if (board[location].equals(MARKS[PLAYER_X]) ||
-                board [location].equals(MARKS[PLAYER_O]))
+                board [location].equals(MARKS[PLAYER_O])){
             return true; // location is occupied
-        else
+        } else
             return false; // location is not occupied
     }
 
     // place code in this method to determine whether game over
     public boolean isGameOver()
     {
-        return false;
+        if(player1Win){
+            return true;
+        } else if(player2Win){
+            return true;
+        }else if(isTie){
+            return true;
+        }else{
+            return false;
+        }
     }
 
     // private inner class Player manages each Player as a runnable
@@ -184,9 +247,7 @@ public class TicTacToeServer extends JFrame
         private int playerNumber; // tracks which player this is
         private String mark; // mark for this player
         private boolean suspended = true; // whether thread is suspended
-        private int win[][] = { {1,2,3},{4,5,6},{7,8,9},{1,4,7},{2,5,8},{3,6,9},{1,5,9},{3,5,7} };
-        private int[] player1 = {0,0,0,0,0};
-        private int[] player2 = {0,0,0,0};
+
 
         // set up Player thread
         public Player(Socket socket, int number)
@@ -207,36 +268,23 @@ public class TicTacToeServer extends JFrame
             }
         }
 
-        public void winCheck(){
-            for(int i = 0; i < win.length; i++){
-                for(int key = 0; key < win[i].length; key++ ){
-                    if(player1.equals(win[i][key])){
-                        output.format("you won");
-                    } else if(player2.equals(win[i][key])){
-                        output.format("player 2 won");
-                    } else {
-                        output.format("something went wrong");
-                    }
-                }
+        public void winMessage(){
+            if(player1Win&& !player2Win){
+                output.format("Player 1 wins\n");
+                output.flush(); // flush output
+            } else if(!player1Win && player2Win){
+                output.format("Player 2 wins\n");
+                output.flush(); // flush output
+            }
+            else if(isTie){
+                output.format("The game ends in a tie!");
+                output.flush();
             }
         }
+
         // send message that other player moved
         public void otherPlayerMoved(int location)
         {
-
-            if(mark != MARKS[PLAYER_O])
-            {
-                for(int i = 0; i < player1.length; i++){
-                    player1[i] = location;
-                    winCheck();
-                }
-            } else {
-                for(int x = 0; x< player2.length; x++){
-                    player2[x] = location;
-                    winCheck();
-                }
-            }
-
             output.format("Opponent moved\n");
             output.format("%d\n", location); // send location of move
             output.flush(); // flush output
@@ -294,11 +342,11 @@ public class TicTacToeServer extends JFrame
 
                     if (input.hasNext())
                         location = input.nextInt(); // get move location
-
                     // check for valid move
                     if (validateAndMove(location, playerNumber))
                     {
                         displayMessage("\nlocation: " + location);
+
                         output.format("Valid move.\n"); // notify client
                         output.flush(); // flush output
                     }

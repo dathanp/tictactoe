@@ -2,14 +2,17 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.Socket;
 import java.net.InetAddress;
 import java.io.IOException;
-import javax.swing.*;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import java.util.Formatter;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -29,10 +32,8 @@ public class TicTacToeClient extends JFrame implements Runnable
     private String ticTacToeHost; // host name for server
     private String myMark; // this client's mark
     private boolean myTurn; // determines which client's turn it is
-    private boolean gameOver = false;
     private final String X_MARK = "X"; // mark for first client
     private final String O_MARK = "O"; // mark for second client
-    private JButton button = new JButton("Restart Game");
 
     // set up user-interface and board
     public TicTacToeClient(String host)
@@ -65,25 +66,11 @@ public class TicTacToeClient extends JFrame implements Runnable
 
         panel2 = new JPanel(); // set up panel to contain boardPanel
         panel2.add(boardPanel, BorderLayout.CENTER); // add board panel
-        panel2.add(button);
         add(panel2, BorderLayout.CENTER); // add container panel
-        button.setVisible(false);
-        button.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                gameEnd();
-                if(gameOver){
-                    for(int i = 0; i < board.length; i++){
-                        for (Square square : board[i]) {
-                            setMark(square,"");
-                        }
-                    }
 
-                }
-            }
-        });
         setSize(300, 225); // set size of window
         setVisible(true); // show window
+
         startClient();
     }
 
@@ -139,39 +126,31 @@ public class TicTacToeClient extends JFrame implements Runnable
     // process messages received by client
     private void processMessage(String message)
     {
-        if(!gameOver) {
-            // valid move occurred
-            if (message.equals("Valid move.")) {
-                displayMessage("Valid move, please wait.\n");
-                setMark(currentSquare, myMark); // set mark in square
-            } else if (message.equals("Invalid move, try again")) {
-                displayMessage(message + "\n"); // display invalid move
-                myTurn = true; // still this client's turn
-            } else if (message.equals("Opponent moved")) {
-                int location = input.nextInt(); // get move location
-                input.nextLine(); // skip newline after int location
-                int row = location / 3; // calculate row
-                int column = location % 3; // calculate column
-
-                setMark(board[row][column],
-                        (myMark.equals(X_MARK) ? O_MARK : X_MARK)); // mark move
-                displayMessage("Opponent moved. Your turn.\n");
-                myTurn = true; // now this client's turn
-            } else if (message.equals("Player 1 wins")) {
-                displayMessage(message + "\n"); // display the message
-                gameOver = true;
-                gameEnd();
-            } else if (message.equals("Player 2 wins")) {
-                displayMessage(message + "\n"); // display the message
-                gameOver = true;
-                gameEnd();
-            } else if (message.equals("The game ends in a tie!")) {
-                displayMessage(message + "\n"); // display the message
-                gameOver = true;
-                gameEnd();
-            } else
-                displayMessage(message + "\n"); // display the message
+        // valid move occurred
+        if (message.equals("Valid move."))
+        {
+            displayMessage("Valid move, please wait.\n");
+            setMark(currentSquare, myMark); // set mark in square
         }
+        else if (message.equals("Invalid move, try again"))
+        {
+            displayMessage(message + "\n"); // display invalid move
+            myTurn = true; // still this client's turn
+        }
+        else if (message.equals("Opponent moved"))
+        {
+            int location = input.nextInt(); // get move location
+            input.nextLine(); // skip newline after int location
+            int row = location / 3; // calculate row
+            int column = location % 3; // calculate column
+
+            setMark(board[row][column],
+                    (myMark.equals(X_MARK) ? O_MARK : X_MARK)); // mark move
+            displayMessage("Opponent moved. Your turn.\n");
+            myTurn = true; // now this client's turn
+        }
+        else
+            displayMessage(message + "\n"); // display the message
     }
 
     // manipulate displayArea in event-dispatch thread
@@ -200,12 +179,6 @@ public class TicTacToeClient extends JFrame implements Runnable
                     }
                 }
         );
-    }
-
-    public void gameEnd(){
-        if(gameOver){
-            button.setVisible(true);
-        }
     }
 
     // send message to server indicating clicked square
